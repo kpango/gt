@@ -39,5 +39,5 @@ var (
 func main() {
 	gt.Print(dummyStruct)
 	fmt.Println("fuck")
-	gt.Print(dummyStruct)
+	gt.Print(dummyStructs)
 }

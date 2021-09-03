@@ -1,8 +1,8 @@
 package gt
 
 import (
-	"fmt"
 	"reflect"
+	"strings"
 )
 
 type (
@@ -25,6 +25,7 @@ type (
 		Columns []Colmun
 	}
 	Colmun struct {
+		header  string
 		index   int
 		width   Width
 		height  Height
@@ -53,26 +54,60 @@ const (
 )
 
 func Print(obj interface{}) {
-	(&Table{}).print(obj)
+	(&Table{}).parse(obj)
 }
 
-func (t *Table) print(data interface{}) string {
+func (t *Table) parse(data interface{}) *Table {
 	rt := reflect.TypeOf(data)
 	rv := reflect.ValueOf(data)
 	switch rt.Kind() {
 	case reflect.Ptr:
-	case reflect.Array:
-	case reflect.Slice:
+		return t.parse(rv.Elem().Interface())
+	case reflect.Array, reflect.Slice:
+		for i := 0; i < rv.Len(); i++ {
+			v := rv.Index(i)
+			if v.Kind() == reflect.Ptr {
+				if v.IsNil() {
+					continue
+				}
+				v = v.Elem()
+			}
+			t.rows = append(t.rows, t.parseRow(v.Type(), v))
+		}
 	case reflect.Struct:
+		t.rows = append(t.rows, t.parseRow(rt, rv))
 	}
-	if rt.Kind() == reflect.Slice {
+	return t
+}
 
-	}
-	t.parseRow(rt, rv)
+func (t *Table) print() string {
 	return ""
 }
 
+func (t *Table) format() *Table {
+	var mHH Height = 0                           // minimum header height
+	mCWs := make([]Width, len(t.header.Columns)) // minimum column widths
+	for x, c := range t.header.Columns {
+		if mHH < c.height {
+			mHH = c.height
+		}
+		if mCWs[x] < c.width {
+			mCWs[x] = c.width
+		}
+	}
+	for y, row := range t.rows {
+		for x, col := range row.Columns {
+
+		}
+	}
+}
+
 func (t *Table) parseRow(rt reflect.Type, rv reflect.Value) Row {
+	row := Row{
+		height:  1,
+		width:   0,
+		Columns: make([]Colmun, 0, rt.NumField()),
+	}
 	for i := 0; i < rt.NumField(); i++ {
 		field := rt.Field(i)
 		tag := field.Tag.Get(tagKey)
@@ -81,13 +116,23 @@ func (t *Table) parseRow(rt reflect.Type, rv reflect.Value) Row {
 		typ := field.Type.Name()
 		if field.Type.Kind() == reflect.Ptr {
 			if value.IsNil() {
-				// TODO empty
 				continue
 			}
 			value = value.Elem()
 		}
 		switch field.Type.Kind() {
 		case reflect.Struct:
+			ir := t.parseRow(field.Type, value)
+			if ir.height > row.height {
+				row.height = ir.height
+			}
+			row.Columns = append(row.Columns, ir.ToColumn())
+		default:
+			str := strings.ReplaceAll(IFtoa(value.Interface()), "\r\n", "\n")
+			row.Columns = append(row.Columns, Colmun{
+				value:  str,
+				height: 1 + strings.Count(str, "\n"),
+			})
 		}
 		// if tag != "" {
 		// 	if strings.Contains(tag, ",") {
@@ -124,10 +169,14 @@ func (t *Table) parseRow(rt reflect.Type, rv reflect.Value) Row {
 		// } else {
 		//
 		// }
-		fmt.Println(tag, name, value, typ)
+		// fmt.Println(tag, name, value, typ)
 	}
 
 	return Row{}
+}
+
+func (r Row) ToColumn() Colmun {
+	return r.Columns[0]
 }
 
 func rawObject(a interface{}) interface{} {
