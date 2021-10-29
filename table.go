@@ -97,7 +97,6 @@ func (t *Table) format() *Table {
 	}
 	for y, row := range t.rows {
 		for x, col := range row.Columns {
-
 		}
 	}
 }
