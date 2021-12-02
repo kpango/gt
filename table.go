@@ -11,10 +11,10 @@ type (
 	Height uint64
 
 	Table struct {
-		header    Header
 		Lines     Lines
+		header    Header
 		rows      []Row
-		EmptyText string
+		emptyText string
 		output    string
 	}
 
@@ -85,20 +85,43 @@ func (t *Table) print() string {
 }
 
 func (t *Table) format() *Table {
-	var mHH Height = 0                           // minimum header height
-	mCWs := make([]Width, len(t.header.Columns)) // minimum column widths
+	mRHs := make([]Height, len(t.rows)+1)        // max rows height
+	mCWs := make([]Width, len(t.header.Columns)) // max columns width
 	for x, c := range t.header.Columns {
-		if mHH < c.height {
-			mHH = c.height
+		if mRHs[0] < c.height {
+			mRHs[0] = c.height
 		}
 		if mCWs[x] < c.width {
 			mCWs[x] = c.width
 		}
 	}
+
+	t.header.height = mRHs[0]
 	for y, row := range t.rows {
-		for x, col := range row.Columns {
+		for x, c := range row.Columns {
+			if mRHs[y+1] < c.height {
+				mRHs[y+1] = c.height
+			}
+			if mCWs[x] < c.width {
+				mCWs[x] = c.width
+			}
 		}
+		t.rows[y].height = mRHs[y+1]
 	}
+
+	for x := range t.header.Columns {
+		t.header.Columns[x].height = mRHs[0]
+		t.header.Columns[x].width = mCWs[x]
+	}
+
+	for y, row := range t.rows {
+		for x := range row.Columns {
+			t.rows[y].Columns[x].height = mRHs[y+1]
+			t.rows[y].Columns[x].width = mCWs[x]
+		}
+		t.rows[y].height = mRHs[y+1]
+	}
+	return t
 }
 
 func (t *Table) parseRow(rt reflect.Type, rv reflect.Value) Row {
@@ -109,10 +132,10 @@ func (t *Table) parseRow(rt reflect.Type, rv reflect.Value) Row {
 	}
 	for i := 0; i < rt.NumField(); i++ {
 		field := rt.Field(i)
-		tag := field.Tag.Get(tagKey)
-		name := field.Name
+		// tag := field.Tag.Get(tagKey)
+		// name := field.Name
 		value := rv.Field(i)
-		typ := field.Type.Name()
+		// typ := field.Type.Name()
 		if field.Type.Kind() == reflect.Ptr {
 			if value.IsNil() {
 				continue
@@ -127,10 +150,14 @@ func (t *Table) parseRow(rt reflect.Type, rv reflect.Value) Row {
 			}
 			row.Columns = append(row.Columns, ir.ToColumn())
 		default:
-			str := strings.ReplaceAll(IFtoa(value.Interface()), "\r\n", "\n")
+			val, err := IFtoa(value.Interface())
+			if err != nil {
+				continue
+			}
+			str := strings.ReplaceAll(val, "\r\n", "\n")
 			row.Columns = append(row.Columns, Colmun{
 				value:  str,
-				height: 1 + strings.Count(str, "\n"),
+				height: Height(1 + strings.Count(str, "\n")),
 			})
 		}
 		// if tag != "" {
