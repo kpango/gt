@@ -56,7 +56,7 @@ const (
 )
 
 func Print(obj interface{}) {
-	fmt.Println((&Table{}).parse(obj).format().toString())
+	fmt.Println(new(Table).parse(obj).format().toString())
 }
 
 func (t *Table) parse(data interface{}) *Table {
@@ -87,6 +87,9 @@ func (t *Table) toString() string {
 }
 
 func (t *Table) format() *Table {
+	if t == nil || t.rows == nil {
+		return t
+	}
 	mRHs := make([]Height, len(t.rows)+1)        // max rows height
 	mCWs := make([]Width, len(t.header.Columns)) // max columns width
 	for x, c := range t.header.Columns {
@@ -171,7 +174,7 @@ func (t *Table) parseRow(rt reflect.Type, rv reflect.Value) Row {
 			})
 		}
 	}
-	fmt.Println(row)
+	fmt.Printf("%+v", row)
 	return row
 }
 
